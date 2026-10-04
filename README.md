@@ -56,3 +56,8 @@ Set `GEMINI_API_KEY` on the **backend only**. The server uses the Gemini REST `g
 **StayOps AI — AI-Powered Multi-Tenant PG Operations Platform**
 
 Built and upgraded a multi-tenant SaaS platform for PG/co-living operations by extending an existing room/booking/payment/mess stack with tenant-safe authentication, RBAC, maintenance workflows, live command-center analytics and an AI operations copilot. Implemented server-side Gemini integration with a deterministic fallback, tenant-scoped data access, refresh-token sessions, Redis/BullMQ job infrastructure and interactive React dashboards.
+
+## 🔗 Links
+
+- 🌐 Live Demo: (https://stayops-saas-platform.vercel.app)
+- 👨‍💻 Author: [Suyash Chaturvedi](https://github.com/Suyashchaturvedi82)
