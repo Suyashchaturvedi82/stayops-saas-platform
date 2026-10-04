@@ -12,6 +12,7 @@ const residentItems = [
 ];
 const adminItems = [
   { to: '/admin/overview', label: 'Command Center', icon: 'A1' },
+  { to: '/admin/rooms', label: 'Rooms & Beds', icon: 'A0' },
   { to: '/admin/bookings', label: 'Bookings', icon: 'A2' },
   { to: '/admin/payments', label: 'Payments', icon: 'A3' },
   { to: '/admin/mess', label: 'Mess Ops', icon: 'A4' },

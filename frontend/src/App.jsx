@@ -15,6 +15,7 @@ import AdminBookings from './pages/admin/AdminBookings';
 import AdminPayments from './pages/admin/AdminPayments';
 import AdminMess from './pages/admin/AdminMess';
 import AdminCheckout from './pages/admin/AdminCheckout';
+import AdminRooms from './pages/admin/AdminRooms';
 import ProtectedRoute from './routes/ProtectedRoute';
 import useAuth from './hooks/useAuth';
 
@@ -49,6 +50,7 @@ export default function App() {
       <Route element={<ProtectedRoute requiredRoles={operatorRoles}><DashboardLayout /></ProtectedRoute>}>
         <Route path="/admin" element={<Navigate to="/admin/overview" replace />} />
         <Route path="/admin/overview" element={<AdminOverview />} />
+        <Route path="/admin/rooms" element={<AdminRooms />} />
         <Route path="/admin/bookings" element={<AdminBookings />} />
         <Route path="/admin/payments" element={<AdminPayments />} />
         <Route path="/admin/mess" element={<AdminMess />} />
