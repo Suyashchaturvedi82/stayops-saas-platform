@@ -36,9 +36,14 @@ router.post('/', async (req, res, next) => {
     });
   }
 
-  const conn = await db.getConnection();
+  if (!(process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET)) {
+    console.error('Onboarding failed: JWT_ACCESS_SECRET / JWT_SECRET env var is missing');
+    return res.status(500).json({ message: 'Server auth configuration is missing.' });
+  }
 
+  let conn;
   try {
+    conn = await db.getConnection();
     await conn.beginTransaction();
     const slug = slugify(tenant_slug || tenant_name);
 
@@ -130,13 +135,14 @@ router.post('/', async (req, res, next) => {
       },
     });
   } catch (err) {
-    await conn.rollback();
+    if (conn) await conn.rollback().catch(() => {});
+    console.error('Onboarding error:', err.code, err.sqlMessage || err.message);
     if (err.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({ message: 'Workspace or account already exists.' });
     }
     next(err);
   } finally {
-    conn.release();
+    if (conn) conn.release();
   }
 });
 

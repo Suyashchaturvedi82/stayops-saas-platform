@@ -1,54 +1,65 @@
 -- =====================================================
--- ENUM DEFINITIONS (DOCUMENTATION)
+-- SAAS MULTI-TENANCY (WORKSPACES)
 -- =====================================================
--- Booking Status:
--- PENDING, APPROVED, REJECTED, CANCELLED, COMPLETED
---
--- Payment Status:
--- PENDING, VERIFIED, REJECTED, FAILED
---
--- Resident Status:
--- PENDING_APPROVAL, ACTIVE, CHECKED_OUT
---
--- Mess Plan Type:
--- SUBSCRIPTION, PAY_PER_MEAL
---
--- Meal Type:
--- BREAKFAST, LUNCH, DINNER
--- =====================================================
-
-
--- =====================================================
--- USERS & ROLES
--- =====================================================
-
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS tenants (
     id INT PRIMARY KEY AUTO_INCREMENT,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    first_name VARCHAR(100) NOT NULL,
-    last_name VARCHAR(100),
-    phone VARCHAR(15) NOT NULL,
-    gender ENUM('MALE', 'FEMALE', 'OTHER') NOT NULL,
-    date_of_birth DATE,
-    address TEXT,
-    occupation VARCHAR(100),
-    emergency_contact_name VARCHAR(100),
-    emergency_contact_phone VARCHAR(15),
-    profile_image_url VARCHAR(500),
-    is_active BOOLEAN DEFAULT TRUE,
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) UNIQUE NOT NULL,
+    status VARCHAR(50) DEFAULT 'ACTIVE',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
-CREATE TABLE roles (
+-- =====================================================
+-- USERS & AUTHENTICATION
+-- =====================================================
+CREATE TABLE IF NOT EXISTS users (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    tenant_id INT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    name VARCHAR(255) NULL,
+    first_name VARCHAR(100) NULL,
+    last_name VARCHAR(100) NULL,
+    phone VARCHAR(15) NOT NULL,
+    gender ENUM('MALE', 'FEMALE', 'OTHER') NOT NULL,
+    date_of_birth DATE NULL,
+    address TEXT NULL,
+    occupation VARCHAR(100) NULL,
+    emergency_contact_name VARCHAR(100) NULL,
+    emergency_contact_phone VARCHAR(15) NULL,
+    profile_image_url VARCHAR(500) NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS auth_sessions (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    tenant_id INT NOT NULL,
+    user_id INT NOT NULL,
+    device_id VARCHAR(128) NOT NULL,
+    refresh_token_hash VARCHAR(255) NOT NULL,
+    expires_at DATETIME NOT NULL,
+    revoked_at DATETIME NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_auth_session_lookup (tenant_id, user_id, device_id),
+    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- =====================================================
+-- ROLES & WORKSPACE PERMISSIONS
+-- =====================================================
+CREATE TABLE IF NOT EXISTS roles (
     id INT PRIMARY KEY AUTO_INCREMENT,
     name ENUM('USER', 'ADMIN') NOT NULL,
-    description TEXT,
+    description TEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE user_roles (
+CREATE TABLE IF NOT EXISTS user_roles (
     id INT PRIMARY KEY AUTO_INCREMENT,
     user_id INT NOT NULL,
     role_id INT NOT NULL,
@@ -58,32 +69,54 @@ CREATE TABLE user_roles (
     FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE
 );
 
--- =====================================================
--- ROOMS & BEDS (SOURCE OF TRUTH = BEDS)
--- =====================================================
+CREATE TABLE IF NOT EXISTS tenant_roles (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    tenant_id INT NOT NULL,
+    user_id INT NULL,
+    name VARCHAR(50) DEFAULT 'admin',
+    role VARCHAR(50) DEFAULT 'admin',
+    role_id INT NULL, 
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
 
-CREATE TABLE rooms (
+CREATE TABLE IF NOT EXISTS tenant_user_roles (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    tenant_id INT NOT NULL,
+    user_id INT NOT NULL,
+    role_id INT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- =====================================================
+-- ROOMS & BEDS
+-- =====================================================
+CREATE TABLE IF NOT EXISTS rooms (
     id INT PRIMARY KEY AUTO_INCREMENT,
     room_number VARCHAR(20) UNIQUE NOT NULL,
     floor_number INT NOT NULL,
     room_type ENUM('AC', 'NON_AC') NOT NULL,
     max_occupancy INT NOT NULL,
     rent_per_month DECIMAL(10,2) NOT NULL,
-    amenities JSON,
-    is_available BOOLEAN DEFAULT TRUE
-        COMMENT 'Derived from bed availability, not source of truth',
-    description TEXT,
+    amenities JSON NULL,
+    is_available BOOLEAN DEFAULT TRUE,
+    description TEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
-CREATE TABLE beds (
+CREATE TABLE IF NOT EXISTS beds (
     id INT PRIMARY KEY AUTO_INCREMENT,
     room_id INT NOT NULL,
     bed_number VARCHAR(20) NOT NULL,
     rent_per_month DECIMAL(10,2) NOT NULL,
     is_available BOOLEAN DEFAULT TRUE,
-    description TEXT,
+    description TEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY unique_room_bed (room_id, bed_number),
@@ -91,34 +124,26 @@ CREATE TABLE beds (
 );
 
 -- =====================================================
--- BOOKINGS (BED LEVEL)
+-- BOOKINGS & RESIDENTS
 -- =====================================================
-
-CREATE TABLE bookings (
+CREATE TABLE IF NOT EXISTS bookings (
     id INT PRIMARY KEY AUTO_INCREMENT,
     bed_id INT NOT NULL,
     user_id INT NOT NULL,
     check_in_date DATE NOT NULL,
-    expected_check_out_date DATE,
-    actual_check_out_date DATE,
-    booking_status ENUM(
-        'PENDING',
-        'APPROVED',
-        'REJECTED',
-        'CANCELLED',
-        'COMPLETED'
-    ) DEFAULT 'PENDING',
-    hold_expires_at TIMESTAMP NULL
-        COMMENT 'Auto release bed if not approved in time',
+    expected_check_out_date DATE NULL,
+    actual_check_out_date DATE NULL,
+    booking_status ENUM('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED', 'COMPLETED') DEFAULT 'PENDING',
+    hold_expires_at TIMESTAMP NULL,
     advance_amount DECIMAL(10,2) DEFAULT 0,
-    total_rent DECIMAL(10,2),
-    special_requests TEXT,
-    admin_notes TEXT,
-    admin_approved_by INT,
+    total_rent DECIMAL(10,2) NULL,
+    special_requests TEXT NULL,
+    admin_notes TEXT NULL,
+    admin_approved_by INT NULL,
     admin_approved_at TIMESTAMP NULL,
-    cancelled_by INT,
+    cancelled_by INT NULL,
     cancelled_at TIMESTAMP NULL,
-    cancellation_reason TEXT,
+    cancellation_reason TEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (bed_id) REFERENCES beds(id),
@@ -127,26 +152,18 @@ CREATE TABLE bookings (
     FOREIGN KEY (cancelled_by) REFERENCES users(id)
 );
 
--- =====================================================
--- RESIDENTS (LIFECYCLE TRACKING)
--- =====================================================
-
-CREATE TABLE residents (
+CREATE TABLE IF NOT EXISTS residents (
     id INT PRIMARY KEY AUTO_INCREMENT,
     booking_id INT NOT NULL,
     user_id INT NOT NULL,
     bed_id INT NOT NULL,
     move_in_date DATE NOT NULL,
-    expected_move_out_date DATE,
-    actual_move_out_date DATE,
-    resident_status ENUM(
-        'PENDING_APPROVAL',
-        'ACTIVE',
-        'CHECKED_OUT'
-    ) DEFAULT 'PENDING_APPROVAL',
-    security_deposit DECIMAL(10,2),
+    expected_move_out_date DATE NULL,
+    actual_move_out_date DATE NULL,
+    resident_status ENUM('PENDING_APPROVAL', 'ACTIVE', 'CHECKED_OUT') DEFAULT 'PENDING_APPROVAL',
+    security_deposit DECIMAL(10,2) NULL,
     refundable_amount DECIMAL(10,2) DEFAULT 0,
-    final_settlement_date DATE,
+    final_settlement_date DATE NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (booking_id) REFERENCES bookings(id),
@@ -157,33 +174,20 @@ CREATE TABLE residents (
 -- =====================================================
 -- PAYMENTS
 -- =====================================================
-
-CREATE TABLE payments (
+CREATE TABLE IF NOT EXISTS payments (
     id INT PRIMARY KEY AUTO_INCREMENT,
     booking_id INT NOT NULL,
     user_id INT NOT NULL,
-    payment_for ENUM(
-        'ADVANCE',
-        'RENT',
-        'SECURITY_DEPOSIT',
-        'MESS_SUBSCRIPTION',
-        'MEAL_PAYMENT',
-        'OTHER'
-    ) NOT NULL,
+    payment_for ENUM('ADVANCE', 'RENT', 'SECURITY_DEPOSIT', 'MESS_SUBSCRIPTION', 'MEAL_PAYMENT', 'OTHER') NOT NULL,
     amount DECIMAL(10,2) NOT NULL,
     payment_date DATE NOT NULL,
-    payment_status ENUM(
-        'PENDING',
-        'VERIFIED',
-        'REJECTED',
-        'FAILED'
-    ) DEFAULT 'PENDING',
-    upi_transaction_id VARCHAR(100),
-    payment_screenshot_url VARCHAR(500),
-    admin_verified_by INT,
+    payment_status ENUM('PENDING', 'VERIFIED', 'REJECTED', 'FAILED') DEFAULT 'PENDING',
+    upi_transaction_id VARCHAR(100) NULL,
+    payment_screenshot_url VARCHAR(500) NULL,
+    admin_verified_by INT NULL,
     admin_verified_at TIMESTAMP NULL,
-    admin_rejection_reason TEXT,
-    notes TEXT,
+    admin_rejection_reason TEXT NULL,
+    notes TEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (booking_id) REFERENCES bookings(id),
@@ -194,31 +198,26 @@ CREATE TABLE payments (
 -- =====================================================
 -- MESS SYSTEM
 -- =====================================================
-
-CREATE TABLE mess_plans (
+CREATE TABLE IF NOT EXISTS mess_plans (
     id INT PRIMARY KEY AUTO_INCREMENT,
     plan_name VARCHAR(100) NOT NULL,
     plan_type ENUM('SUBSCRIPTION', 'PAY_PER_MEAL') NOT NULL,
-    meals_per_day TINYINT,
-    price_per_month DECIMAL(10,2),
-    price_per_meal DECIMAL(10,2),
+    meals_per_day TINYINT NULL,
+    price_per_month DECIMAL(10,2) NULL,
+    price_per_meal DECIMAL(10,2) NULL,
     is_active BOOLEAN DEFAULT TRUE,
-    description TEXT,
+    description TEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE mess_subscriptions (
+CREATE TABLE IF NOT EXISTS mess_subscriptions (
     id INT PRIMARY KEY AUTO_INCREMENT,
     user_id INT NOT NULL,
     mess_plan_id INT NOT NULL,
     booking_id INT NOT NULL,
     start_date DATE NOT NULL,
-    end_date DATE,
-    subscription_status ENUM(
-        'ACTIVE',
-        'EXPIRED',
-        'CANCELLED'
-    ) DEFAULT 'ACTIVE',
+    end_date DATE NULL,
+    subscription_status ENUM('ACTIVE', 'EXPIRED', 'CANCELLED') DEFAULT 'ACTIVE',
     total_amount DECIMAL(10,2) NOT NULL,
     paid_amount DECIMAL(10,2) DEFAULT 0,
     payment_status ENUM('PENDING', 'PAID', 'PARTIAL') DEFAULT 'PENDING',
@@ -229,16 +228,16 @@ CREATE TABLE mess_subscriptions (
     FOREIGN KEY (booking_id) REFERENCES bookings(id)
 );
 
-CREATE TABLE mess_daily_logs (
+CREATE TABLE IF NOT EXISTS mess_daily_logs (
     id INT PRIMARY KEY AUTO_INCREMENT,
     user_id INT NOT NULL,
     meal_date DATE NOT NULL,
     meal_type ENUM('BREAKFAST', 'LUNCH', 'DINNER') NOT NULL,
-    mess_plan_id INT,
-    booking_id INT,
-    meal_price DECIMAL(10,2),
-    payment_id INT,
-    notes TEXT,
+    mess_plan_id INT NULL,
+    booking_id INT NULL,
+    meal_price DECIMAL(10,2) NULL,
+    payment_id INT NULL,
+    notes TEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY unique_meal (user_id, meal_date, meal_type),
     FOREIGN KEY (user_id) REFERENCES users(id),
@@ -250,27 +249,15 @@ CREATE TABLE mess_daily_logs (
 -- =====================================================
 -- ADMIN AUDIT LOG
 -- =====================================================
-
-CREATE TABLE admin_actions (
+CREATE TABLE IF NOT EXISTS admin_actions (
     id INT PRIMARY KEY AUTO_INCREMENT,
     admin_user_id INT NOT NULL,
     action_type VARCHAR(50) NOT NULL,
     target_table VARCHAR(50) NOT NULL,
     target_id INT NOT NULL,
-    old_values JSON,
-    new_values JSON,
-    notes TEXT,
+    old_values JSON NULL,
+    new_values JSON NULL,
+    notes TEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (admin_user_id) REFERENCES users(id)
 );
-
--- =====================================================
--- INDEXES
--- =====================================================
-
-CREATE INDEX idx_bookings_status ON bookings(booking_status);
-CREATE INDEX idx_beds_availability ON beds(room_id, is_available);
-CREATE INDEX idx_payments_status ON payments(payment_status);
-CREATE INDEX idx_residents_status ON residents(resident_status);
-CREATE INDEX idx_users_phone ON users(phone);
-CREATE INDEX idx_users_email ON users(email);
