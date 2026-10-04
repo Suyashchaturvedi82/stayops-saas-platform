@@ -1,0 +1,119 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=Sora:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #f4f6fb;
+  --text: #141b34;
+  --muted: #5f6c8f;
+  --card: rgba(255, 255, 255, 0.78);
+  --line: rgba(20, 27, 52, 0.1);
+  --brand: #2f5cff;
+  --brand-2: #00b894;
+}
+
+@keyframes fade-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(47, 92, 255, 0.22);
+  }
+  50% {
+    box-shadow: 0 0 0 14px rgba(47, 92, 255, 0);
+  }
+}
+
+@layer base {
+  * {
+    @apply box-border;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: 'Sora', sans-serif;
+    color: var(--text);
+    background:
+      radial-gradient(circle at 8% 12%, rgba(47, 92, 255, 0.2), transparent 38%),
+      radial-gradient(circle at 88% 8%, rgba(0, 184, 148, 0.17), transparent 34%),
+      linear-gradient(180deg, #f8f9ff 0%, #eef1fb 100%);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply tracking-tight;
+  }
+}
+
+@layer components {
+  .app-shell {
+    @apply min-h-screen;
+    background-image: linear-gradient(rgba(20, 27, 52, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(20, 27, 52, 0.04) 1px, transparent 1px);
+    background-size: 34px 34px;
+  }
+
+  .glass-card {
+    background: var(--card);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--line);
+    @apply rounded-2xl shadow-[0_18px_38px_-28px_rgba(20,27,52,0.55)] transition-all duration-300;
+  }
+
+  .hover-lift {
+    @apply transition-all duration-300;
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 26px 40px -30px rgba(20, 27, 52, 0.68);
+  }
+
+  .page-enter {
+    animation: fade-rise 420ms ease both;
+  }
+
+  .stagger-enter {
+    opacity: 0;
+    animation: fade-rise 480ms ease forwards;
+  }
+
+  .glow-ring {
+    animation: pulse-glow 2.8s infinite;
+  }
+
+  .mono-label {
+    font-family: 'IBM Plex Mono', monospace;
+    letter-spacing: 0.06em;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter,
+  .stagger-enter,
+  .glow-ring {
+    animation: none !important;
+    opacity: 1;
+  }
+
+  .hover-lift,
+  .glass-card {
+    transition: none !important;
+  }
+}
