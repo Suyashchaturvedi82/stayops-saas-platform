@@ -11,5 +11,7 @@ router.get('/my', verifyToken, bookingController.getMyBookings);
 router.get('/pending', verifyToken, checkRole('ADMIN'), bookingController.getPendingBookings);
 router.put('/:id/approve', verifyToken, checkRole('ADMIN'), bookingController.approveBooking);
 router.put('/:id/reject', verifyToken, checkRole('ADMIN'), bookingController.rejectBooking);
+// BOOKED -> OCCUPIED (move-in), part of the Phase 2 state machine.
+router.put('/:id/check-in', verifyToken, checkRole('ADMIN'), bookingController.checkInBooking);
 
 module.exports = router;

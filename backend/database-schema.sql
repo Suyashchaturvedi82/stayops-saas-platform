@@ -12,13 +12,13 @@ CREATE TABLE IF NOT EXISTS tenants (
 
 -- =====================================================
 -- USERS & AUTHENTICATION
+-- Global identity: one row per email. A user may hold
+-- memberships in any number of workspaces (tenant_memberships).
 -- =====================================================
 CREATE TABLE IF NOT EXISTS users (
     id INT PRIMARY KEY AUTO_INCREMENT,
-    tenant_id INT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
-    name VARCHAR(255) NULL,
     first_name VARCHAR(100) NULL,
     last_name VARCHAR(100) NULL,
     phone VARCHAR(15) NOT NULL,
@@ -31,8 +31,7 @@ CREATE TABLE IF NOT EXISTS users (
     profile_image_url VARCHAR(500) NULL,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS auth_sessions (
@@ -50,47 +49,33 @@ CREATE TABLE IF NOT EXISTS auth_sessions (
 );
 
 -- =====================================================
--- ROLES & WORKSPACE PERMISSIONS
+-- ROLES & WORKSPACE PERMISSIONS (canonical SaaS model)
+-- users -> tenant_memberships -> tenant_roles -> tenants
 -- =====================================================
-CREATE TABLE IF NOT EXISTS roles (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    name ENUM('USER', 'ADMIN') NOT NULL,
-    description TEXT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS user_roles (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    user_id INT NOT NULL,
-    role_id INT NOT NULL,
-    assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY unique_user_role (user_id, role_id),
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE
-);
-
 CREATE TABLE IF NOT EXISTS tenant_roles (
     id INT PRIMARY KEY AUTO_INCREMENT,
     tenant_id INT NOT NULL,
-    user_id INT NULL,
-    name VARCHAR(50) DEFAULT 'admin',
-    role VARCHAR(50) DEFAULT 'admin',
-    role_id INT NULL, 
+    name ENUM('OWNER', 'MANAGER', 'ACCOUNTANT', 'FRONTDESK', 'RESIDENT') NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    UNIQUE KEY uniq_tenant_role (tenant_id, name),
+    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS tenant_user_roles (
+-- Membership: a single user (email) may be OWNER in one workspace
+-- and RESIDENT in another. Roles are always scoped to a tenant.
+CREATE TABLE IF NOT EXISTS tenant_memberships (
     id INT PRIMARY KEY AUTO_INCREMENT,
     tenant_id INT NOT NULL,
     user_id INT NOT NULL,
-    role_id INT NULL,
+    role_id INT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_tenant_user_role (tenant_id, user_id, role_id),
+    KEY idx_membership_user (user_id),
     FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (role_id) REFERENCES tenant_roles(id) ON DELETE CASCADE
 );
 
 -- =====================================================

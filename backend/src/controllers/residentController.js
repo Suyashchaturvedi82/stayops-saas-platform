@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const machine = require('../modules/bookings/bookingStateMachine');
 
 const getActiveResidents = async (req, res) => {
   try {
@@ -28,13 +29,20 @@ const checkoutResident = async (req, res) => {
     );
     if (!resident.length) throw new Error('Active resident not found');
     const { booking_id, bed_id } = resident[0];
+    // Strict machine: OCCUPIED (or legacy APPROVED) -> COMPLETED.
+    const [bookingRows] = await connection.execute(
+      'SELECT booking_status FROM bookings WHERE id = ? AND tenant_id = ? FOR UPDATE',
+      [booking_id, req.user.tenant_id]
+    );
+    if (!bookingRows.length) throw new Error('Booking not found');
+    machine.assertTransition(bookingRows[0].booking_status, 'COMPLETED');
     await connection.execute(`UPDATE residents SET resident_status = 'CHECKED_OUT', actual_move_out_date = CURDATE() WHERE id = ? AND tenant_id = ?`, [residentId, req.user.tenant_id]);
-    await connection.execute(`UPDATE beds SET is_available = true WHERE id = ? AND tenant_id = ?`, [bed_id, req.user.tenant_id]);
+    await connection.execute(`UPDATE beds SET is_available = true, status = 'AVAILABLE' WHERE id = ? AND tenant_id = ?`, [bed_id, req.user.tenant_id]);
     await connection.execute(`UPDATE bookings SET booking_status = 'COMPLETED', actual_check_out_date = CURDATE() WHERE id = ? AND tenant_id = ?`, [booking_id, req.user.tenant_id]);
     await connection.commit();
     res.json({ message: 'Resident checked out successfully' });
   } catch (error) {
-    await connection.rollback(); console.error(error); res.status(400).json({ message: error.message });
+    await connection.rollback(); console.error(error); res.status(error.statusCode || 400).json({ message: error.message });
   } finally { connection.release(); }
 };
 

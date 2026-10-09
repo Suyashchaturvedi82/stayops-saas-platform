@@ -7,7 +7,8 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "worker:webhooks": "node src/jobs/workers/webhookWorker.js",
-    "worker:automations": "node src/jobs/workers/automationWorker.js"
+    "worker:automations": "node src/jobs/workers/automationWorker.js",
+    "worker:holds": "node src/jobs/workers/bookingHoldWorker.js"
   },
   "keywords": [
     "nodejs",

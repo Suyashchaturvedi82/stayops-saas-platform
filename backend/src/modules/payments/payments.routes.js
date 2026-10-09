@@ -40,11 +40,19 @@ router.post('/webhook', async (req, res, next) => {
     }
 
     const eventId = req.body.event_id;
+    // The webhook is HMAC-signed, but tenant_id in the payload is still
+    // signer-controlled: only accept it when it names a real workspace.
+    let tenantId = null;
+    const claimedTenantId = Number(req.body.tenant_id);
+    if (Number.isInteger(claimedTenantId) && claimedTenantId > 0) {
+      const [rows] = await db.execute('SELECT id FROM tenants WHERE id = ? LIMIT 1', [claimedTenantId]);
+      tenantId = rows.length ? claimedTenantId : null;
+    }
     await enqueueWebhookEvent({
       provider: req.body.provider || 'custom',
       eventId,
       payload: req.body,
-      tenantId: req.body.tenant_id || null,
+      tenantId,
     });
 
     return res.json({ received: true });

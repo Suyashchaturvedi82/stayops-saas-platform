@@ -22,13 +22,28 @@ export function AuthProvider({ children }) {
     return data.user;
   };
 
-  const login = async ({ email, password }) => {
-    const response = await api.post('/auth/login', { email, password, device_id: getDeviceId() });
+  // Distinct backend handlers per audience; same identity core.
+  const login = async ({ audience = 'tenant', email, password, tenant_slug }) => {
+    const response = await api.post(`/auth/${audience}/login`, {
+      email,
+      password,
+      device_id: getDeviceId(),
+      ...(tenant_slug ? { tenant_slug } : {}),
+    });
     return establishSession(response.data);
   };
 
-  const register = async ({ first_name, last_name, email, password, phone, gender, role = 'RESIDENT' }) => {
-    return api.post('/auth/register', { first_name, last_name, email, password, phone, gender, role });
+  // `role` is never sent: the backend always assigns RESIDENT on register.
+  const register = async ({ first_name, last_name, email, password, phone, gender, tenant_slug }) => {
+    return api.post('/auth/register', {
+      first_name,
+      last_name,
+      email,
+      password,
+      phone,
+      gender,
+      ...(tenant_slug ? { tenant_slug } : {}),
+    });
   };
 
   const onboard = async (payload) => {
@@ -40,6 +55,8 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('token');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('user');
+    localStorage.removeItem('tenant_id');
+    localStorage.removeItem('tenant_slug');
     setUser(null);
   };
 

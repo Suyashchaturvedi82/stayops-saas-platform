@@ -42,9 +42,13 @@ const updateBed = async (req, res) => {
   const { id } = req.params;
   const { bed_number, is_available } = req.body;
   try {
+    // Keep the Phase 2 state machine consistent with the legacy flag:
+    // available => AVAILABLE, unavailable => at least occupied.
     const [result] = await db.execute(
-      'UPDATE beds SET bed_number = ?, is_available = ? WHERE id = ? AND tenant_id = ?',
-      [bed_number, is_available, id, req.user.tenant_id]
+      `UPDATE beds SET bed_number = ?, is_available = ?,
+        status = IF(? = 1, 'AVAILABLE', IF(status = 'AVAILABLE', 'OCCUPIED', status))
+       WHERE id = ? AND tenant_id = ?`,
+      [bed_number, is_available, is_available, id, req.user.tenant_id]
     );
     if (!result.affectedRows) return res.status(404).json({ message: 'Bed not found' });
     res.json({ message: 'Bed updated successfully' });

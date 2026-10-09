@@ -44,7 +44,7 @@ export default function Bookings() {
                   <p className="text-lg font-semibold text-slate-900">
                     Booking #{bookings.length - index} - Room {booking.room_number}
                   </p>
-                  <Badge type={booking.booking_status === 'APPROVED' ? 'success' : booking.booking_status === 'REJECTED' ? 'danger' : 'warning'}>
+                  <Badge type={['BOOKED', 'OCCUPIED', 'COMPLETED', 'APPROVED'].includes(booking.booking_status) ? 'success' : ['REJECTED', 'CANCELLED', 'EXPIRED'].includes(booking.booking_status) ? 'danger' : 'warning'}>
                     {booking.booking_status}
                   </Badge>
                 </div>

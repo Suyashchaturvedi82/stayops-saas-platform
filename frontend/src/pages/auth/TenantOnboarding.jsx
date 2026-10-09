@@ -60,7 +60,7 @@ export default function TenantOnboarding() {
             <Input label="Confirm Password" type="password" name="confirmPassword" value={form.confirmPassword} onChange={change} minLength={8} required />
             <Button type="submit" className="sm:col-span-2" disabled={loading}>{loading ? 'Creating workspace...' : 'Create Workspace & Enter Dashboard'}</Button>
           </form>
-          <p className="mt-5 text-center text-sm text-slate-500">Already set up? <a href="/login" className="font-semibold text-[#2f5cff]">Sign in</a></p>
+          <p className="mt-5 text-center text-sm text-slate-500">Already set up? <a href="/login/owner" className="font-semibold text-[#2f5cff]">Sign in</a></p>
         </div>
       </div>
     </div>

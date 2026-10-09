@@ -8,6 +8,9 @@ const mysql = require('mysql2/promise');
 const FILES = [
   '2026-02-20_saas_multitenant_upgrade.sql',
   '2026-09-30_stayops_upgrade.sql',
+  '2026-10-08_phase1_identity_cleanup.sql',
+  '2026-10-09_phase2_booking_state_machine.sql',
+  '2026-10-09_phase3_public_marketplace.sql',
 ].map((f) => path.join(__dirname, '..', 'docs', 'migrations', f));
 
 // 1060 dup column, 1061 dup index, 1050 table exists, 1091 can't drop (absent), 1826/1022 dup FK/key

@@ -1,0 +1,4 @@
+# Machine-local run/debug scripts (contain local dev DB credentials)
+tmp/wsl-*.sh
+tmp/*.service
+tmp/netprobe.js

@@ -1,5 +1,5 @@
-# Dependency directories
-node_modules/
+# Dependency directories (no trailing slash: also matches a symlinked node_modules)
+node_modules
 
 # Environment variables (Contains DB passwords - VERY IMPORTANT to ignore)
 .env

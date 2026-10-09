@@ -1,11 +1,21 @@
 const db = require('../config/db');
 
+/**
+ * Resolves PRE-AUTH workspace context from x-tenant-id / x-tenant-slug.
+ *
+ * It is intentionally lenient: when no header is present the request
+ * continues with req.tenant = null. Authenticated routes must derive
+ * tenant_id exclusively from the verified JWT (see authSaasMiddleware
+ * and authMiddleware) — never from client-supplied headers, body or
+ * query parameters.
+ */
 async function tenantMiddleware(req, res, next) {
   const tenantSlug = req.headers['x-tenant-slug'];
   const tenantIdHeader = req.headers['x-tenant-id'];
 
   if (!tenantSlug && !tenantIdHeader) {
-    return res.status(400).json({ message: 'Tenant header missing. Use x-tenant-id or x-tenant-slug.' });
+    req.tenant = null;
+    return next();
   }
 
   try {

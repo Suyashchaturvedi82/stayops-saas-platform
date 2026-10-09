@@ -20,6 +20,7 @@ const platformRoutes = require('./routes/platformRoutes');
 const onboardingRoutes = require('./modules/onboarding/onboarding.routes');
 const maintenanceRoutes = require('./modules/maintenance/maintenance.routes');
 const aiRoutes = require('./modules/ai/ai.routes');
+const publicRoutes = require('./modules/public/public.routes');
 const tenantMiddleware = require('./middleware/tenantMiddleware');
 
 const app = express();
@@ -40,6 +41,8 @@ app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, limit: 300, standardHeaders: 'draft-7', legacyHeaders: false }));
 
 app.use('/api', healthRoutes);
+// Public marketplace: NO tenant context required until a booking is requested.
+app.use('/api/public', publicRoutes);
 app.use('/api/onboarding', onboardingRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/rooms', roomRoutes);
@@ -53,7 +56,7 @@ app.use('/api/admin', adminDashboardRoutes);
 app.use('/api/maintenance', tenantMiddleware, maintenanceRoutes);
 app.use('/api/ai', tenantMiddleware, aiRoutes);
 
-app.use('/api/platform', platformRoutes);
+app.use('/api/platform', tenantMiddleware, platformRoutes);
 app.use('/api/v1', saasRoutes);
 
 app.use((req, res) => {
@@ -63,7 +66,10 @@ app.use((req, res) => {
 app.use((err, _req, res, _next) => {
   console.error(err);
   const status = err.statusCode || 500;
-  res.status(status).json({ message: err.message || 'Internal Server Error' });
+  res.status(status).json({
+    message: err.message || 'Internal Server Error',
+    ...(err.details ? { details: err.details } : {}),
+  });
 });
 
 module.exports = app;

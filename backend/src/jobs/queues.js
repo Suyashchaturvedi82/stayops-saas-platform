@@ -10,6 +10,7 @@ const queues = {
   webhooksQueue: new Queue('webhooks', { connection }),
   reportsQueue: new Queue('reports', { connection }),
   automationsQueue: new Queue('automations', { connection }),
+  bookingHoldsQueue: new Queue('booking-holds', { connection }),
 };
 
 module.exports = {

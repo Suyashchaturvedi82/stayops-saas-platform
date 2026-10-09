@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const machine = require('../modules/bookings/bookingStateMachine');
 
 const checkoutPreview = async (req, res) => {
   const { residentId } = req.params;
@@ -32,6 +33,13 @@ const confirmCheckout = async (req, res) => {
       [residentId, req.user.tenant_id]
     );
     if (!resident) throw new Error('Invalid resident, bed or booking not linked');
+    // Strict machine: OCCUPIED (or legacy APPROVED) -> COMPLETED.
+    const [bookingRows] = await conn.execute(
+      'SELECT booking_status FROM bookings WHERE id = ? AND tenant_id = ? FOR UPDATE',
+      [resident.booking_id, req.user.tenant_id]
+    );
+    if (!bookingRows.length) throw new Error('Booking not found');
+    machine.assertTransition(bookingRows[0].booking_status, 'COMPLETED');
     const [[pendingRent]] = await conn.execute(
       `SELECT IFNULL(SUM(amount), 0) AS pendingRent FROM payments
        WHERE tenant_id = ? AND user_id = ? AND payment_for = 'RENT' AND payment_status = 'PENDING'`,
@@ -41,7 +49,7 @@ const confirmCheckout = async (req, res) => {
       Number(resident.security_deposit || 0) - Number(pendingRent.pendingRent || 0) - Number(damage_deduction) - Number(other_charges)
     );
     await conn.execute(`UPDATE residents SET resident_status = 'CHECKED_OUT', actual_move_out_date = ?, refundable_amount = ?, final_settlement_date = NOW() WHERE id = ? AND tenant_id = ?`, [actual_move_out_date, finalAmount, residentId, req.user.tenant_id]);
-    await conn.execute(`UPDATE beds SET is_available = 1 WHERE id = ? AND tenant_id = ?`, [resident.bed_id, req.user.tenant_id]);
+    await conn.execute(`UPDATE beds SET is_available = 1, status = 'AVAILABLE' WHERE id = ? AND tenant_id = ?`, [resident.bed_id, req.user.tenant_id]);
     await conn.execute(`UPDATE bookings SET booking_status = 'COMPLETED' WHERE id = ? AND tenant_id = ?`, [resident.booking_id, req.user.tenant_id]);
     await conn.execute(
       `INSERT INTO payments (tenant_id, user_id, booking_id, payment_for, amount, payment_status, notes, payment_date)
@@ -51,7 +59,7 @@ const confirmCheckout = async (req, res) => {
     await conn.commit();
     res.json({ message: 'Checkout completed successfully', finalSettlementAmount: finalAmount });
   } catch (err) {
-    await conn.rollback(); console.error(err); res.status(400).json({ message: err.message });
+    await conn.rollback(); console.error(err); res.status(err.statusCode || 400).json({ message: err.message });
   } finally { conn.release(); }
 };
 

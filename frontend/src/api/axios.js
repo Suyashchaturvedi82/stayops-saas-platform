@@ -18,13 +18,23 @@ const getDeviceId = () => {
   return value;
 };
 
+// Pre-auth calls may carry workspace context headers (login/register/
+// onboarding). Authenticated calls NEVER do: tenant_id comes from the JWT.
+const PRE_AUTH_PREFIXES = ['/auth/register', '/auth/owner/login', '/auth/tenant/login', '/auth/login', '/onboarding'];
+
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
-  const tenantId = localStorage.getItem('tenant_id');
-  const tenantSlug = localStorage.getItem('tenant_slug');
+  const url = config.url || '';
+  const isPreAuth = PRE_AUTH_PREFIXES.some((prefix) => url.startsWith(prefix));
+
   if (token) config.headers.Authorization = `Bearer ${token}`;
-  if (tenantId) config.headers['x-tenant-id'] = tenantId;
-  if (tenantSlug) config.headers['x-tenant-slug'] = tenantSlug;
+
+  if (isPreAuth) {
+    const tenantId = localStorage.getItem('tenant_id');
+    const tenantSlug = localStorage.getItem('tenant_slug');
+    if (tenantId) config.headers['x-tenant-id'] = tenantId;
+    if (tenantSlug) config.headers['x-tenant-slug'] = tenantSlug;
+  }
   return config;
 });
 
@@ -55,7 +65,7 @@ api.interceptors.response.use(
         localStorage.removeItem('token');
         localStorage.removeItem('refresh_token');
         localStorage.removeItem('user');
-        if (!['/login', '/register', '/onboarding'].includes(window.location.pathname)) window.location.href = '/login';
+        if (!['/login', '/login/tenant', '/login/owner', '/register', '/onboarding'].includes(window.location.pathname)) window.location.href = '/login';
         return Promise.reject(refreshError);
       }
     }
@@ -63,7 +73,7 @@ api.interceptors.response.use(
     if (status === 401 && !isRefresh) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      if (!['/login', '/register', '/onboarding'].includes(window.location.pathname)) window.location.href = '/login';
+      if (!['/login', '/login/tenant', '/login/owner', '/register', '/onboarding'].includes(window.location.pathname)) window.location.href = '/login';
     }
     return Promise.reject(error);
   }

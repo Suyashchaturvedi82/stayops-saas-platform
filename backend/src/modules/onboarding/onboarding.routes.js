@@ -57,12 +57,14 @@ router.post('/', async (req, res, next) => {
       throw error;
     }
 
+    // Global email identity: an existing person may onboard a NEW workspace
+    // (becoming its OWNER). Reuse the identity when the password matches.
     const [[existingUser]] = await conn.execute(
-      'SELECT id FROM users WHERE email = ? LIMIT 1',
+      'SELECT id, password_hash FROM users WHERE email = ? LIMIT 1',
       [email.trim().toLowerCase()]
     );
-    if (existingUser) {
-      const error = new Error('An account already exists for this email.');
+    if (existingUser && !(await bcrypt.compare(password, existingUser.password_hash))) {
+      const error = new Error('An account already exists for this email. Sign in instead.');
       error.statusCode = 409;
       throw error;
     }
@@ -84,21 +86,27 @@ router.post('/', async (req, res, next) => {
     const parts = owner_name.trim().split(/\s+/);
     const firstName = parts.shift();
     const lastName = parts.join(' ') || null;
-    const passwordHash = await bcrypt.hash(password, 10);
 
-    const [userResult] = await conn.execute(
-      `INSERT INTO users (email, password_hash, first_name, last_name, phone, gender)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [email.trim().toLowerCase(), passwordHash, firstName, lastName, phone.trim(), gender]
-    );
-    const userId = userResult.insertId;
+    let userId;
+    if (existingUser) {
+      userId = existingUser.id;
+    } else {
+      const passwordHash = await bcrypt.hash(password, 10);
+      const [userResult] = await conn.execute(
+        `INSERT INTO users (email, password_hash, first_name, last_name, phone, gender)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [email.trim().toLowerCase(), passwordHash, firstName, lastName, phone.trim(), gender]
+      );
+      userId = userResult.insertId;
+    }
 
     const [[ownerRole]] = await conn.execute(
       `SELECT id FROM tenant_roles WHERE tenant_id = ? AND name = 'OWNER' LIMIT 1`,
       [tenantId]
     );
     await conn.execute(
-      `INSERT INTO tenant_user_roles (tenant_id, user_id, role_id) VALUES (?, ?, ?)`,
+      `INSERT INTO tenant_memberships (tenant_id, user_id, role_id) VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE role_id = role_id`,
       [tenantId, userId, ownerRole.id]
     );
 
